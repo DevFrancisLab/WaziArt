@@ -16,6 +16,7 @@ metta/rules/review.metta       Presence, permission, theme, and recommendation r
 metta/rules/challenge.metta    Disputes, current facts, and revision comparison
 metta/rules/graph.metta        Edges derived from those rules
 metta/examples/peace_exhibition.metta
+src/waziart/images.py          Image validation, local files, and safe paths
 src/waziart/symbols.py         Safe atoms and the snapshot whitelist
 src/waziart/runtime.py         Hyperon runner, queries, and snapshot swap
 src/waziart/service.py         Submit, challenge, and re-infer

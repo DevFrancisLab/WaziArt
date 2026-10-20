@@ -17,7 +17,7 @@ Hyperon 0.2.10 exposes `hyperonpy.load_ascii` and a `load-ascii` operation. A di
 - `(note art-ascii "hello (world)")` came back with an extra space inside the string.
 - Loading the same file twice duplicated the atoms.
 
-The snapshot format is therefore the canonical S-expression printed for each data atom. On load, `parse_all` only parses. A whitelist then requires every atom to be a `fact`, `superseded-by`, `challenge`, `challenge-note`, `dispute`, `audit`, or `revision-compare`, with symbols and grounded strings in fixed positions. Nested expressions, variables, and equality rules are rejected, and nothing is added unless the whole file passes.
+The snapshot format is therefore the canonical S-expression printed for each data atom. On load, `parse_all` only parses. A whitelist then requires every atom to be a `fact`, `superseded-by`, `challenge`, `challenge-note`, `dispute`, `audit`, `revision-compare`, or `artwork-image`, with symbols and grounded strings in fixed positions. An `artwork-image` atom stores only the generated upload filename. The image bytes stay in `data/uploads/` and are not evidence. Nested expressions, variables, and equality rules are rejected, and nothing is added unless the whole file passes.
 
 User prose is wrapped with `ValueAtom`. It is never interpolated into a program string. Queries accept only a checked token grammar, so an artwork id cannot close the expression and start another one.
 

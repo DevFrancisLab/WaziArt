@@ -1,4 +1,5 @@
 import type { ArtworkSummary } from "../types";
+import { ArtworkFigure } from "./ArtworkFigure";
 
 interface ArtworkListProps {
   artworks: ArtworkSummary[];
@@ -9,9 +10,7 @@ interface ArtworkListProps {
 
 export function ArtworkList({ artworks, selectedId, busy, onOpen }: ArtworkListProps) {
   return (
-    <section aria-labelledby="stored-heading">
-      <h2 id="stored-heading">Stored submissions</h2>
-      {artworks.length === 0 ? <p>No submissions are stored in this snapshot yet.</p> : null}
+    <>
       <ul className="saved">
         {artworks.map((artwork) => {
           const title = artwork.title || "(no title)";
@@ -24,15 +23,13 @@ export function ArtworkList({ artworks, selectedId, busy, onOpen }: ArtworkListP
                 disabled={busy}
                 onClick={() => onOpen(artwork.artwork_id)}
               >
+                <ArtworkFigure src={artwork.image} title={title} />
                 <span className="saved-title">{title}</span>
-                <span className="saved-id">{artwork.artwork_id}</span>
-                <span className="saved-label">{artwork.label}</span>
-                <code>{artwork.recommendation}</code>
               </button>
             </li>
           );
         })}
       </ul>
-    </section>
+    </>
   );
 }

@@ -56,6 +56,7 @@ export function ChallengeForm({ review, vocabulary, busy, onSubmit }: ChallengeF
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [draft, setDraft] = useState<ChallengeBody | null>(null);
 
   const selected = targets.find((item) => item.value === target) ?? targets[0];
   const role = selected?.role ?? "permission";
@@ -89,27 +90,30 @@ export function ChallengeForm({ review, vocabulary, busy, onSubmit }: ChallengeF
       }
     }
     setError("");
+    setDraft({
+      role,
+      action,
+      value,
+      evidence_id: role === "evidence" ? selected.evidenceId : "",
+      note: note.trim(),
+    });
+  }
+
+  async function confirm() {
+    if (!draft) return;
+    setError("");
     try {
-      await onSubmit({
-        role,
-        action,
-        value,
-        evidence_id: role === "evidence" ? selected.evidenceId : "",
-        note: note.trim(),
-      });
+      await onSubmit(draft);
+      setDraft(null);
       setNote("");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The challenge could not be sent.");
+      setError(caught instanceof Error ? caught.message : "The correction could not be saved.");
     }
   }
 
   return (
     <section aria-labelledby="challenge-heading">
-      <h3 id="challenge-heading">Challenge or correct a fact</h3>
-      <p className="hint">
-        A correction keeps the previous fact and adds a new one. A dispute leaves the fact in place and marks it
-        contested. MeTTa then infers the recommendation again.
-      </p>
+      <h3 id="challenge-heading">Correct information</h3>
       <form onSubmit={handleSubmit} noValidate>
         <div className="field">
           <label htmlFor="challenge-target">Fact</label>
@@ -197,9 +201,26 @@ export function ChallengeForm({ review, vocabulary, busy, onSubmit }: ChallengeF
             {error}
           </p>
         ) : null}
-        <button type="submit" disabled={busy}>
-          {busy ? "Reassessing in MeTTa…" : "Record challenge and reassess"}
-        </button>
+        {draft ? (
+          <div className="confirm-row">
+            <p>
+              {draft.action === "dispute"
+                ? `Dispute ${draft.role}.`
+                : `Change ${draft.role} to ${draft.value}.`}{" "}
+              Nothing changes until you confirm.
+            </p>
+            <button type="button" onClick={() => void confirm()} disabled={busy}>
+              {busy ? "Saving…" : "Confirm correction"}
+            </button>
+            <button type="button" className="secondary" onClick={() => setDraft(null)} disabled={busy}>
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button type="submit" disabled={busy}>
+            Correct information
+          </button>
+        )}
       </form>
     </section>
   );

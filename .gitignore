@@ -5,6 +5,7 @@ __pycache__/
 .DS_Store
 .env
 data/
+data/uploads/
 *.tmp
 .pytest_cache/
 .tools/

@@ -1,12 +1,14 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import type { EvidenceDraft, SubmissionBody, Vocabulary } from "../types";
 
 const SYMBOL = /^[a-z][a-z0-9]*([_-][a-z0-9]+)*$/;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 interface ArtworkSubmissionFormProps {
   vocabulary: Vocabulary | null;
   busy: boolean;
-  onSubmit: (body: SubmissionBody) => Promise<void>;
+  onSubmit: (body: SubmissionBody, image: File) => Promise<void>;
 }
 
 interface EvidenceRow extends EvidenceDraft {
@@ -33,33 +35,25 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
   const [themeOther, setThemeOther] = useState("");
   const [permission, setPermission] = useState("");
   const [rows, setRows] = useState<EvidenceRow[]>([]);
+  const [image, setImage] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
+  const sending = useRef(false);
 
-  function fill(sample: "gap" | "ready" | "dispute") {
-    const theme = vocabulary?.exhibition_theme ?? "peace";
-    const concept = vocabulary?.concepts.includes("reconciliation")
-      ? "reconciliation"
-      : (vocabulary?.concepts[0] ?? "");
-    setArtworkId(sample === "gap" ? "paths-to-peace" : sample === "ready" ? "ready-work" : "disputed-memorial");
-    setTitle(sample === "dispute" ? "Disputed Memorial" : "Paths to Peace");
-    setDescription(
-      sample === "dispute"
-        ? "A shared wall lists names the two communities do not yet agree how to read."
-        : "Figures meet (and listen) beside a paper river.",
-    );
-    setThemeChoice(theme);
-    setThemeOther("");
-    setPermission(sample === "ready" ? "confirmed" : sample === "dispute" ? "disputed" : "");
-    setRows(
-      concept
-        ? [{ key: nextKey(), concept, note: "The boats meet in the middle of the corridor.", other: "" }]
-        : [],
-    );
-    setError("");
-  }
+  useEffect(() => {
+    if (!image || typeof URL.createObjectURL !== "function") {
+      setPreview("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(image);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (sending.current || busy) return;
     const problem = validate();
     if (problem) {
       setError(problem);
@@ -71,23 +65,33 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
       concept: row.concept === "other" ? row.other.trim().toLowerCase() : row.concept,
       note: row.note.trim(),
     }));
+    if (!image) {
+      setError("Choose an artwork image before submitting.");
+      return;
+    }
+    sending.current = true;
     try {
-      await onSubmit({
-        artwork_id: artworkId.trim() || undefined,
-        title: title.trim(),
-        description: description.trim(),
-        theme,
-        permission,
-        evidence,
-      });
+      await onSubmit(
+        {
+          artwork_id: artworkId.trim() || undefined,
+          title: title.trim(),
+          description: description.trim(),
+          theme,
+          permission,
+          evidence,
+        },
+        image,
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The submission could not be sent.");
+    } finally {
+      sending.current = false;
     }
   }
 
   function validate(): string {
     if (artworkId.trim() && !SYMBOL.test(artworkId.trim().toLowerCase())) {
-      return "The identifier must be a short lowercase token such as paths-to-peace.";
+      return "The identifier must be a short lowercase token.";
     }
     if (themeChoice === "other" && !SYMBOL.test(themeOther.trim().toLowerCase())) {
       return "The other theme must be a short lowercase token such as peace.";
@@ -97,7 +101,34 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
       if (!concept) return "Choose a concept for each evidence row, or remove the row.";
       if (!SYMBOL.test(concept)) return "An evidence concept must be a short lowercase token such as dialogue.";
     }
+    if (!image) return "Choose an artwork image before submitting.";
     return "";
+  }
+
+  function takeFile(file: File | undefined) {
+    if (!file) return;
+    const extension = file.name.toLowerCase();
+    const typeAllowed = IMAGE_TYPES.has(file.type) || (!file.type && /\.(jpe?g|png|webp)$/.test(extension));
+    if (!typeAllowed) {
+      setError("Choose a JPEG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("The image must be 10 MB or smaller.");
+      return;
+    }
+    if (file.size === 0) {
+      setError("The image file is empty.");
+      return;
+    }
+    setError("");
+    setImage(file);
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    takeFile(event.dataTransfer.files?.[0]);
   }
 
   const concepts = vocabulary?.concepts ?? [];
@@ -106,40 +137,60 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
 
   return (
     <section aria-labelledby="submission">
-      <h2 id="submission">Submit artwork</h2>
-      <p className="hint">
-        Leave a field blank when it was not supplied. The description is stored as text. Choose an evidence concept
-        separately. The paragraph is not read as evidence.
-      </p>
-      <div className="samples">
-        <p id="samples-heading" className="samples-label">
-          Demo shortcuts
-        </p>
-        <p className="hint">These fill the form. Nothing is reviewed until you submit it.</p>
-        <div className="row" role="group" aria-labelledby="samples-heading">
-          <button type="button" onClick={() => fill("gap")}>
-            Fill: permission not supplied
-          </button>
-          <button type="button" onClick={() => fill("ready")} disabled={!vocabulary}>
-            Fill: ready for review
-          </button>
-          <button type="button" onClick={() => fill("dispute")} disabled={!vocabulary}>
-            Fill: disputed permission
-          </button>
+      <h2 id="submission">Upload artwork</h2>
+      <form aria-labelledby="submission" onSubmit={handleSubmit} noValidate>
+        <div className="field">
+          <label htmlFor="artwork-image">Artwork image</label>
+          <p id="image-hint" className="hint">
+            JPEG, PNG, or WebP. 10 MB maximum.
+          </p>
+          <div
+            className={dragging ? "upload-zone dragging" : "upload-zone"}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+          >
+            <input
+              id="artwork-image"
+              name="image"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              aria-describedby="image-hint"
+              onChange={(event) => takeFile(event.target.files?.[0])}
+            />
+            <span>{image ? "Replace image" : "Drop an image here, or choose a file."}</span>
+          </div>
+          {image ? (
+            <div className="selected-image">
+              {preview ? <img src={preview} alt="Selected artwork preview" /> : null}
+              <p>{image.name}</p>
+              <button type="button" onClick={() => setImage(null)}>
+                Remove image
+              </button>
+            </div>
+          ) : null}
         </div>
-      </div>
-      <form onSubmit={handleSubmit} noValidate>
         <div className="field">
           <label htmlFor="artwork-id">
-            Identifier <span className="hint">optional, such as paths-to-peace</span>
+            Identifier <span className="hint">optional</span>
           </label>
           <input
             id="artwork-id"
             name="artwork_id"
             value={artworkId}
             autoComplete="off"
+            aria-invalid={error.toLowerCase().includes("identifier") || undefined}
+            aria-describedby={error.toLowerCase().includes("identifier") ? "artwork-id-error" : undefined}
             onChange={(event) => setArtworkId(event.target.value)}
           />
+          {error.toLowerCase().includes("identifier") ? (
+            <p id="artwork-id-error" className="alert" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
         <div className="field">
           <label htmlFor="title">Title</label>
@@ -152,7 +203,7 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
             onChange={(event) => setTitle(event.target.value)}
           />
         </div>
-        <div className="field">
+        <div className="field prose-field">
           <label htmlFor="description">Description</label>
           <textarea
             id="description"
@@ -164,7 +215,7 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
             onChange={(event) => setDescription(event.target.value)}
           />
           <p id="description-hint" className="hint">
-            Stored as text. WaziArt does not infer evidence from this paragraph.
+            Text only. Not used as evidence.
           </p>
         </div>
         <div className="field">
@@ -218,8 +269,9 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
             ))}
           </div>
         </fieldset>
-        <fieldset>
+        <fieldset className="evidence-set">
           <legend>Evidence concepts</legend>
+          <p className="hint">Choose a concept. The description is not a concept.</p>
           {rows.length === 0 ? <p className="hint">No evidence concept has been added.</p> : null}
           {rows.map((row) => (
             <div className="evidence-row" key={row.key}>
@@ -286,13 +338,13 @@ export function ArtworkSubmissionForm({ vocabulary, busy, onSubmit }: ArtworkSub
             Add evidence
           </button>
         </fieldset>
-        {error ? (
+        {error && !error.toLowerCase().includes("identifier") ? (
           <p className="alert" role="alert" tabIndex={-1}>
             {error}
           </p>
         ) : null}
         <button type="submit" disabled={busy || !vocabulary}>
-          {busy ? "Asking MeTTa…" : "Submit for review"}
+          {busy ? "Uploading…" : "Upload artwork"}
         </button>
       </form>
     </section>

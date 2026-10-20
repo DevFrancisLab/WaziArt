@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 
 // The React dev server and `vite preview` forward /api to the Python process.
 // Recommendations stay on that process; this config does not add another backend.
-const api = "http://127.0.0.1:8000";
+const api = process.env.WAZIART_API ?? "http://127.0.0.1:8000";
 
 export default defineConfig({
   plugins: [react()],
@@ -18,5 +18,6 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
+    testTimeout: 20000,
   },
 });

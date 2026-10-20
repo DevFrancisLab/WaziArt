@@ -8,36 +8,6 @@ const results = document.querySelector("#results");
 const savedList = document.querySelector("#saved-list");
 const savedEmpty = document.querySelector("#saved-empty");
 
-document.querySelector("#sample-gap").addEventListener("click", () => fillSample({
-  id: "paths-to-peace",
-  title: "Paths to Peace",
-  description: "Figures meet (and listen) beside a paper river.",
-  theme: "peace",
-  permission: "",
-  concept: "reconciliation",
-  note: "The boats meet in the middle of the corridor."
-}));
-
-document.querySelector("#sample-ready").addEventListener("click", () => fillSample({
-  id: "paths-to-peace-ready",
-  title: "Paths to Peace",
-  description: "Figures meet (and listen) beside a paper river.",
-  theme: "peace",
-  permission: "confirmed",
-  concept: "reconciliation",
-  note: "The boats meet in the middle of the corridor."
-}));
-
-document.querySelector("#sample-dispute").addEventListener("click", () => fillSample({
-  id: "disputed-memorial",
-  title: "Disputed Memorial",
-  description: "A shared wall lists names the two communities do not yet agree how to read.",
-  theme: "peace",
-  permission: "disputed",
-  concept: "memorial",
-  note: ""
-}));
-
 document.querySelector("#add-evidence").addEventListener("click", () => addEvidenceRow());
 document.querySelector("#theme").addEventListener("change", syncThemeOther);
 document.querySelectorAll('#challenge-form input[name="action"]').forEach((input) => {
@@ -56,25 +26,10 @@ async function start() {
     vocabulary.exhibition_theme = vocab.exhibition_theme;
     document.querySelector("#footer-status").textContent =
       `Hyperon ${health.hyperon}. Exhibition theme: ${health.exhibition_theme}. Storage: ${health.persistence}.`;
-    addEvidenceRow("reconciliation", "");
     await refreshList();
   } catch (error) {
     document.querySelector("#footer-status").textContent = error.message;
   }
-}
-
-function fillSample(sample) {
-  submitForm.elements.artwork_id.value = sample.id;
-  submitForm.elements.title.value = sample.title;
-  submitForm.elements.description.value = sample.description;
-  submitForm.elements.theme.value = sample.theme;
-  syncThemeOther();
-  const permission = submitForm.querySelector(`input[name="permission"][value="${sample.permission}"]`);
-  if (permission) permission.checked = true;
-  evidenceRows.replaceChildren();
-  addEvidenceRow(sample.concept, sample.note);
-  hide(document.querySelector("#form-alert"));
-  document.querySelector("#title").focus();
 }
 
 function syncThemeOther() {

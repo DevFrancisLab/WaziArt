@@ -50,6 +50,7 @@ export interface ChallengeRecord {
 
 export interface Review {
   artwork_id: string;
+  image?: string | null;
   recommendation: string;
   label: string;
   status_note: string;
@@ -74,6 +75,7 @@ export interface ArtworkSummary {
   title: string;
   recommendation: string;
   label: string;
+  image?: string | null;
 }
 
 export interface EvidenceDraft {

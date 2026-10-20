@@ -68,4 +68,8 @@ The Python command `python -m waziart` still serves the original static page at 
 
 `evaluated-by` edges are exhibition criteria. The other edges belong to the current review.
 
-The open submission is stored in the page address as `?artwork=`. Reloading the page asks the API for that review again. Demo shortcut buttons only fill the form. They do not invent a recommendation.
+The open artwork is stored in the page address as `?artwork=`. Reloading the page asks the API for that review again. An empty list shows no sample artwork.
+
+A new submission includes an artwork image. The file is sent as multipart form data and saved under `data/uploads/` with a generated name. MeTTa stores that name, not the image bytes, and the picture is not treated as evidence. Artworks stored earlier without an image still open. The image URL is `/api/uploads/<name>`, which Vite proxies with the rest of `/api`.
+
+A correction is not saved until you confirm it. Confirm sends the existing challenge request. There is no language-model API.

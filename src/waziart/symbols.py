@@ -13,6 +13,7 @@ from typing import Iterable
 from hyperon import E, ExpressionAtom, GroundedAtom, S, SymbolAtom, ValueAtom, Atom
 
 from waziart.errors import SnapshotError, WaziError
+from waziart.images import IMAGE_NAME
 
 # Lowercase tokens only, so a snapshot cannot smuggle MeTTa's True/False
 # literals or an uppercase operator. Underscores appear in recommendation
@@ -67,6 +68,7 @@ DATA_PREDICATES = frozenset(
         "dispute",
         "audit",
         "revision-compare",
+        "artwork-image",
     }
 )
 
@@ -193,6 +195,13 @@ def validate_data_atom(atom: Atom) -> None:
         names = _symbols(children, 5)
         if names[3] not in RECOMMENDATIONS or names[4] not in RECOMMENDATIONS:
             raise SnapshotError("A revision does not name recommendation symbols.")
+    elif predicate == "artwork-image":
+        if len(children) != 3:
+            raise SnapshotError("An artwork image has the wrong shape.")
+        _expect_symbol(children[1], "artwork id")
+        filename = _expect_text(children[2], "image reference")
+        if not IMAGE_NAME.fullmatch(filename):
+            raise SnapshotError("An artwork image reference is not a stored upload name.")
     else:
         raise SnapshotError(f"Predicate {predicate} cannot be stored.")
 
@@ -288,6 +297,13 @@ def fact_note(fact_id: str, artwork_id: str, evidence_id: str, note: str) -> Exp
         sym(evidence_id),
         text_atom(note),
     )
+
+
+def image_reference(artwork_id: str, filename: str) -> ExpressionAtom:
+    """A stored upload name. The bytes are not an atom and not evidence."""
+    if not IMAGE_NAME.fullmatch(filename):
+        raise WaziError("Refusing to store an image reference that is not a saved upload name.")
+    return E(S("artwork-image"), sym(artwork_id), text_atom(filename))
 
 
 def link(predicate: str, *names: str) -> ExpressionAtom:

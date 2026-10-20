@@ -17,6 +17,7 @@ from hyperon import Atom, ExpressionAtom, SymbolAtom
 from waziart import __version__
 
 from waziart.errors import NotFoundError, WaziError
+from waziart.images import discard_image, store_image
 from waziart.runtime import KnowledgeBase, atom_symbol, expression_children
 from waziart.symbols import (
     ACTIONS,
@@ -28,6 +29,7 @@ from waziart.symbols import (
     fact_symbol,
     fact_text,
     grounded_text,
+    image_reference,
     link,
     require_symbol,
     sym,
@@ -56,6 +58,7 @@ class Submission:
     permission: str | None = None
     evidence: list[EvidenceInput] = field(default_factory=list)
     artwork_id: str | None = None
+    image_name: str | None = None
 
 
 @dataclass
@@ -108,14 +111,34 @@ class ReviewService:
             "recommendations": list(RECOMMENDATIONS),
         }
 
-    def submit(self, submission: Submission) -> dict:
-        """Store a submission and return the recommendation MeTTa infers."""
+    def submit(self, submission: Submission, image: tuple[bytes, str] | None = None) -> dict:
+        """Store a submission and return the recommendation MeTTa infers.
+
+        ``image`` is ``(bytes, declared content type)``. The file is written
+        before the atoms are committed. A failed commit removes that file.
+        """
         with self._lock:
             artwork_id = self._new_artwork_id(submission.artwork_id)
-            atoms = self._submission_atoms(artwork_id, submission)
-            self._commit(atoms)
-            self.knowledge.save()
+            saved_name = None
+            try:
+                if image is not None:
+                    data, declared = image
+                    saved_name = store_image(self.uploads_dir(), data, declared)
+                    submission.image_name = saved_name
+                atoms = self._submission_atoms(artwork_id, submission)
+                self._commit(atoms)
+                self.knowledge.save()
+            except Exception:
+                if saved_name:
+                    discard_image(self.uploads_dir(), saved_name)
+                raise
             return self._review(artwork_id, highlight=None)
+
+    def uploads_dir(self) -> Path:
+        """Directory for image files that belong to this snapshot."""
+        if self.knowledge.snapshot_path is None:
+            raise WaziError("Image uploads need a snapshot directory.")
+        return self.knowledge.snapshot_path.parent / "uploads"
 
     def challenge(self, artwork_id: str, challenge: ChallengeInput) -> dict:
         """Record a challenge, infer again, and keep both recommendations."""
@@ -164,6 +187,7 @@ class ReviewService:
                         "artwork_id": artwork_id,
                         "title": title or "",
                         "recommendation": recommendation,
+                        "image": self._image_url(artwork_id),
                     }
                 )
             return summaries
@@ -172,6 +196,7 @@ class ReviewService:
         recommendation = self._recommendation(artwork_id)
         return {
             "artwork_id": artwork_id,
+            "image": self._image_url(artwork_id),
             "recommendation": recommendation,
             "trace": [self._quoted(atom) for atom in self.knowledge.query(f"(trace-item {artwork_id})")],
             "edges": [self._quoted(atom) for atom in self.knowledge.query(f"(graph-edge {artwork_id})")],
@@ -259,6 +284,8 @@ class ReviewService:
                 cursor += 1
         if cursor != len(fact_ids):
             raise WaziError("Could not allocate fact identifiers.")
+        if submission.image_name:
+            atoms.append(image_reference(artwork_id, submission.image_name))
         return atoms
 
     def _challenge_atoms(self, artwork_id: str, challenge: ChallengeInput) -> list[Atom]:
@@ -385,6 +412,27 @@ class ReviewService:
     def _require_known(self, artwork_id: str) -> None:
         if artwork_id not in self._artwork_ids():
             raise NotFoundError(f"No submission is stored for {artwork_id}.")
+
+    def _image_url(self, artwork_id: str) -> str | None:
+        """Public path for the stored image. Absence is not an error."""
+        name = self._image_name(artwork_id)
+        if name is None:
+            return None
+        return f"/api/uploads/{name}"
+
+    def _image_name(self, artwork_id: str) -> str | None:
+        """Read the upload name from the snapshot. Recommendation rules do not."""
+        found = None
+        for atom in self.knowledge.data_atoms():
+            children = expression_children(atom)
+            if not children or atom_symbol(children[0]) != "artwork-image" or len(children) != 3:
+                continue
+            if atom_symbol(children[1]) != artwork_id:
+                continue
+            name = grounded_text(children[2])
+            if name:
+                found = name
+        return found
 
     def _artwork_ids(self) -> list[str]:
         names = []

@@ -8,17 +8,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import hyperon
 
 from waziart import __version__
 from waziart.errors import NotFoundError, WaziError
 from waziart.present import LABELS, present_review
+from waziart.images import CONTENT_TYPES, resolve_image
 from waziart.service import ChallengeInput, EvidenceInput, ReviewService, Submission
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -26,7 +28,8 @@ STATIC_FILES = {
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
 }
-MAX_BODY = 65_536
+MAX_JSON = 65_536
+MAX_UPLOAD = 10 * 1024 * 1024 + MAX_JSON
 
 
 def _submission(body: dict) -> Submission:
@@ -96,6 +99,9 @@ class ReviewHandler(BaseHTTPRequestHandler):
         if path == "/api/artworks":
             self._json(200, {"artworks": [self._summary(item) for item in self.server.service.list_artworks()]})
             return
+        if path.startswith("/api/uploads/"):
+            self._upload(path[len("/api/uploads/") :])
+            return
         if path.startswith("/api/artworks/"):
             artwork_id = path[len("/api/artworks/") :]
             if not artwork_id or "/" in artwork_id:
@@ -111,6 +117,13 @@ class ReviewHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib handler name
         path = urlparse(self.path).path
         try:
+            if path == "/api/artworks" and self._is_multipart():
+                fields, image = self._multipart()
+                if image is None:
+                    raise WaziError("Choose an artwork image.")
+                review = self.server.service.submit(_submission(fields), image=image)
+                self._json(201, present_review(review))
+                return
             body = self._body()
             if path == "/api/artworks":
                 review = self.server.service.submit(_submission(body))
@@ -133,11 +146,36 @@ class ReviewHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
+    def _is_multipart(self) -> bool:
+        return self.headers.get("Content-Type", "").lower().startswith("multipart/form-data")
+
+    def _upload(self, name: str) -> None:
+        filename = unquote(name)
+        if filename != name or "/" in filename or "\\" in filename:
+            self._json(404, {"error": "That image was not found."})
+            return
+        try:
+            path = resolve_image(self.server.service.uploads_dir(), filename)
+            payload = path.read_bytes()
+        except (WaziError, OSError):
+            self._json(404, {"error": "That image was not found."})
+            return
+        self._bytes(200, payload, CONTENT_TYPES.get(path.suffix, "application/octet-stream"))
+
+    def _multipart(self) -> tuple[dict, tuple[bytes, str] | None]:
+        content_type = self.headers.get("Content-Type", "")
+        raw = self._read(MAX_UPLOAD)
+        fields, image = _parse_multipart(content_type, raw)
+        evidence = fields.get("evidence", "[]")
+        try:
+            parsed = json.loads(evidence) if evidence else []
+        except json.JSONDecodeError as exc:
+            raise WaziError("Evidence must be a JSON list.") from exc
+        fields["evidence"] = parsed
+        return fields, image
+
     def _body(self) -> dict:
-        length = int(self.headers.get("Content-Length", "0") or "0")
-        if length < 0 or length > MAX_BODY:
-            raise WaziError("The request is too large.")
-        raw = self.rfile.read(length) if length else b"{}"
+        raw = self._read(MAX_JSON) or b"{}"
         try:
             data = json.loads(raw.decode("utf-8"))
         except (UnicodeError, json.JSONDecodeError) as exc:
@@ -165,7 +203,14 @@ class ReviewHandler(BaseHTTPRequestHandler):
             "title": item["title"],
             "recommendation": recommendation,
             "label": LABELS.get(recommendation, recommendation),
+            "image": item.get("image"),
         }
+
+    def _read(self, limit: int) -> bytes:
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length < 0 or length > limit:
+            raise WaziError("The request is too large.")
+        return self.rfile.read(length) if length else b""
 
     def _json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -190,6 +235,53 @@ class ReviewServer(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], service: ReviewService):
         super().__init__(address, ReviewHandler)
         self.service = service
+
+
+def _parse_multipart(content_type: str, body: bytes) -> tuple[dict, tuple[bytes, str] | None]:
+    """Read form fields and one image part. The original filename is not a path."""
+    match = re.search(r"""boundary\s*=\s*"?([^";]+)"?""", content_type, re.IGNORECASE)
+    if not match:
+        raise WaziError("The upload is missing a multipart boundary.")
+    marker = b"--" + match.group(1).encode("ascii", "ignore")
+    fields: dict[str, str] = {}
+    image: tuple[bytes, str] | None = None
+    for chunk in body.split(marker):
+        chunk = chunk.strip(b"\r\n")
+        if not chunk or chunk == b"--":
+            continue
+        if chunk.endswith(b"--"):
+            chunk = chunk[:-2].strip(b"\r\n")
+        header_blob, separator, data = chunk.partition(b"\r\n\r\n")
+        if not separator:
+            continue
+        headers = header_blob.decode("utf-8", "replace")
+        disposition = _header_value(headers, "content-disposition")
+        name = _disposition_param(disposition, "name")
+        if not name:
+            continue
+        if data.endswith(b"\r\n"):
+            data = data[:-2]
+        if name == "image":
+            declared = _header_value(headers, "content-type").split(";", 1)[0].strip().lower()
+            image = (data, declared or "application/octet-stream")
+            continue
+        fields[name] = data.decode("utf-8")
+    return fields, image
+
+
+def _header_value(headers: str, name: str) -> str:
+    prefix = name.lower() + ":"
+    for line in headers.split("\r\n"):
+        if line.lower().startswith(prefix):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def _disposition_param(disposition: str, key: str) -> str | None:
+    match = re.search(rf"""(?:^|;)\s*{key}\s*=\s*"([^"]*)"|{key}\s*=\s*([^;]+)""", disposition, re.IGNORECASE)
+    if not match:
+        return None
+    return (match.group(1) if match.group(1) is not None else match.group(2)).strip()
 
 
 def make_server(service: ReviewService, host: str = "127.0.0.1", port: int = 8000) -> ReviewServer:

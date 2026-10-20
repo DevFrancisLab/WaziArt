@@ -22,7 +22,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
       headers: {
         Accept: "application/json",
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...(init?.body && !(typeof FormData !== "undefined" && init.body instanceof FormData)
+          ? { "Content-Type": "application/json" }
+          : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -69,10 +71,18 @@ export function getArtwork(artworkId: string): Promise<Review> {
   return request<Review>(`/api/artworks/${encodeURIComponent(artworkId)}`);
 }
 
-export function submitArtwork(body: SubmissionBody): Promise<Review> {
+export function submitArtwork(body: SubmissionBody, image: File): Promise<Review> {
+  const form = new FormData();
+  if (body.artwork_id) form.set("artwork_id", body.artwork_id);
+  form.set("title", body.title);
+  form.set("description", body.description);
+  form.set("theme", body.theme);
+  form.set("permission", body.permission);
+  form.set("evidence", JSON.stringify(body.evidence));
+  form.set("image", image);
   return request<Review>("/api/artworks", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: form,
   });
 }
 

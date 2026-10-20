@@ -1,11 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { App } from "../App";
 import { RecommendationPanel } from "../components/RecommendationPanel";
 import { ReasoningGraph } from "../components/ReasoningGraph";
 import { ReasoningTrace } from "../components/ReasoningTrace";
-import { review, vocabulary } from "./fixtures";
+import { pngFile, review, vocabulary } from "./fixtures";
 
 /**
  * These tests stub fetch so the interface can be checked without a running server.
@@ -69,32 +69,44 @@ describe("review journey", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading the exhibition vocabulary.");
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
-    });
-    expect(screen.getByRole("status")).toHaveTextContent("No submissions are stored");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
+    expect(await screen.findByRole("heading", { name: "No artwork yet" })).toBeInTheDocument();
+    expect(screen.queryByText("Paths to Peace")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Fill: permission not supplied" }));
-    await user.click(screen.getByRole("button", { name: "Submit for review" }));
+    await user.click(screen.getAllByRole("button", { name: "Upload artwork" })[0]);
+    const form = await screen.findByRole("form", { name: "Upload artwork" });
+    await user.type(within(form).getByLabelText("Title"), "River Study");
+    await user.type(within(form).getByLabelText("Description"), "Figures meet beside a paper river.");
+    await user.selectOptions(within(form).getByLabelText("Exhibition theme"), "peace");
+    await user.click(within(form).getByRole("button", { name: "Add evidence" }));
+    await user.selectOptions(screen.getByLabelText("Evidence concept"), "reconciliation");
+    await user.upload(within(form).getByLabelText("Artwork image"), pngFile());
+    await user.click(within(form).getByRole("button", { name: "Upload artwork" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent("Request information (request_information)");
+      expect(screen.getByRole("status")).toHaveTextContent("Request information");
     });
+    await user.click(screen.getByRole("button", { name: "See reasoning" }));
     expect(screen.getByText("Permission was not supplied, so it is not treated as confirmed.")).toBeInTheDocument();
     expect(screen.getAllByText("has-evidence").length).toBeGreaterThan(0);
     expect(screen.getByText("Exhibition criterion")).toBeInTheDocument();
     const submitCall = fetchMock.mock.calls.find((call) => String(call[0]).endsWith("/api/artworks") && call[1]?.method === "POST");
     expect(submitCall).toBeTruthy();
-    const posted = JSON.parse(String(submitCall?.[1]?.body));
-    expect(posted.permission).toBe("");
-    expect(posted.description).toContain("paper river");
-    expect(posted.evidence[0].concept).toBe("reconciliation");
+    const posted = submitCall?.[1]?.body;
+    expect(posted).toBeInstanceOf(FormData);
+    const postedForm = posted as FormData;
+    expect(postedForm.get("permission")).toBe("");
+    expect(String(postedForm.get("description"))).toContain("paper river");
+    expect(JSON.parse(String(postedForm.get("evidence")))[0].concept).toBe("reconciliation");
+    expect(postedForm.get("image")).toBeInstanceOf(File);
 
     await user.selectOptions(screen.getByLabelText("Fact"), "permission|");
     await user.selectOptions(screen.getByLabelText("Corrected permission"), "confirmed");
     await user.type(screen.getByLabelText("Note optional"), "Letter received.");
-    await user.click(screen.getByRole("button", { name: "Record challenge and reassess" }));
+    await user.click(screen.getByRole("button", { name: "Correct information" }));
+    expect(screen.getByText(/Nothing changes until you confirm/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/challenges"))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Confirm correction" }));
 
     expect(await screen.findByText(/changed from request_information to recommend_for_review/)).toBeInTheDocument();
     expect(screen.getByText(/Previous value: Not supplied/)).toBeInTheDocument();
@@ -120,15 +132,19 @@ describe("review journey", () => {
     );
 
     render(<App />);
+    await user.click(await screen.findByRole("heading", { name: "No artwork yet" }));
+    await user.click(screen.getAllByRole("button", { name: "Upload artwork" })[0]);
+    const form = await screen.findByRole("form", { name: "Upload artwork" });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
+      expect(within(form).getByRole("button", { name: "Upload artwork" })).toBeEnabled();
     });
-    await user.type(screen.getByLabelText(/Identifier/), "BAD ID");
-    await user.click(screen.getByRole("button", { name: "Submit for review" }));
+    await user.type(within(form).getByLabelText(/Identifier/), "BAD ID");
+    await user.click(within(form).getByRole("button", { name: "Upload artwork" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("short lowercase token");
 
-    await user.clear(screen.getByLabelText(/Identifier/));
-    await user.click(screen.getByRole("button", { name: "Submit for review" }));
+    await user.clear(within(form).getByLabelText(/Identifier/));
+    await user.upload(within(form).getByLabelText("Artwork image"), pngFile());
+    await user.click(within(form).getByRole("button", { name: "Upload artwork" }));
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Permission must be confirmed");
     });
@@ -138,6 +154,9 @@ describe("review journey", () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ error: "The review service failed before it could answer." }, 500)));
     render(<App />);
     expect(await screen.findByRole("alert")).toHaveTextContent("failed before it could answer");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByText("Paths to Peace")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "No artwork yet" })).not.toBeInTheDocument();
     render(<ReasoningGraph edges={[]} />);
     expect(screen.getByText("No reasoning relationships were returned for this review.")).toBeInTheDocument();
   });
@@ -175,16 +194,19 @@ describe("review journey", () => {
     );
 
     render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Submissions" }));
     await user.click(await screen.findByRole("button", { name: /Paths to Peace/ }));
     await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent("Request information (request_information)");
+      expect(screen.getByRole("status")).toHaveTextContent("Request information");
     });
     expect(window.location.search).toContain("artwork=paths-to-peace");
+    expect(screen.queryByRole("dialog", { name: "Submissions" })).not.toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "Submissions" }));
     await user.click(screen.getByRole("button", { name: /Missing/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("No submission is stored for missing-work.");
-    expect(screen.getByRole("status")).toHaveTextContent("Request information (request_information)");
-    expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Request information");
+    expect(screen.getByRole("heading", { name: "Paths to Peace" })).toBeInTheDocument();
   });
 
   it("reloads the artwork named in the address from the API", async () => {
@@ -227,15 +249,127 @@ describe("review journey", () => {
     );
 
     render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("Human review");
+    });
+    await user.click(screen.getByRole("button", { name: "See reasoning" }));
     expect(await screen.findByText(/changed from request_information to human_review/)).toBeInTheDocument();
     expect(screen.getByText(/Previous value: reconciliation/)).toBeInTheDocument();
     expect(screen.getByText(/Note: The concept is contested./)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Human review (human_review)");
+    expect(screen.getByRole("status")).toHaveTextContent("Human review");
+  });
+
+  it("opens the submission form from the welcome screen", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/vocabulary")) return json(vocabulary);
+        if (url.endsWith("/api/artworks")) return json({ artworks: [] });
+        return json({ error: "not found" }, 404);
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "No artwork yet" })).toBeInTheDocument();
+    expect(screen.queryByText("Paths to Peace")).not.toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Upload artwork" })[0]);
+    await waitFor(() => expect(screen.getByLabelText("Artwork image")).toHaveFocus());
+    expect(screen.getByRole("form", { name: "Upload artwork" })).toBeInTheDocument();
+  });
+
+  it("confirms a proposed correction before the challenge request", async () => {
+    const user = userEvent.setup();
+    const opened = review("request_information", "Request information");
+    const revised = review("recommend_for_review", "Recommend for review", {
+      revisions: [
+        {
+          revision_id: "revision-9",
+          before: "request_information",
+          after: "recommend_for_review",
+          expr: "(revision revision-9 request_information recommend_for_review)",
+          latest: true,
+          summary: "The recommendation changed from request_information to recommend_for_review.",
+          before_label: "Request information",
+          after_label: "Recommend for review",
+        },
+      ],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url.endsWith("/api/vocabulary")) return json(vocabulary);
+      if (url.endsWith("/api/artworks") && method === "GET") {
+        return json({
+          artworks: [
+            {
+              artwork_id: "paths-to-peace",
+              title: "Paths to Peace",
+              recommendation: "request_information",
+              label: "Request information",
+            },
+          ],
+        });
+      }
+      if (url.endsWith("/api/artworks/paths-to-peace") && method === "GET") return json(opened);
+      if (url.includes("/challenges") && method === "POST") return json(revised);
+      return json({ error: "not found" }, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Submissions" }));
+    await user.click(await screen.findByRole("button", { name: /Paths to Peace/ }));
+    expect(screen.queryByRole("heading", { name: "What changed" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "See reasoning" }));
+    await user.selectOptions(await screen.findByLabelText("Fact"), "permission|");
+    await user.selectOptions(screen.getByLabelText("Corrected permission"), "confirmed");
+    await user.click(screen.getByRole("button", { name: "Correct information" }));
+    expect(await screen.findByText(/Nothing changes until you confirm/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/challenges"))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Confirm correction" }));
+    expect(await screen.findByText(/changed from request_information to recommend_for_review/)).toBeInTheDocument();
+    const challengeCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("/challenges"));
+    expect(JSON.parse(String(challengeCall?.[1]?.body))).toMatchObject({
+      role: "permission",
+      action: "correct",
+      value: "confirmed",
+    });
+    expect(screen.getByText("See reasoning")).toBeInTheDocument();
+    expect(screen.getByText("Exhibition criterion")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What changed" })).toBeInTheDocument();
+  });
+
+  it("keeps the submissions control collapsed at a narrow width", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: String(query).includes("960"),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/vocabulary")) return json(vocabulary);
+        if (url.endsWith("/api/artworks")) return json({ artworks: [] });
+        return json({ error: "not found" }, 404);
+      }),
+    );
+    try {
+      render(<App />);
+      expect(await screen.findByRole("heading", { name: "No artwork yet" })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Upload artwork" }).length).toBeGreaterThan(0);
+      expect(screen.queryByText("Paths to Peace")).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
   it("displays the recommendation symbol from the payload", () => {
-    render(<RecommendationPanel review={review("human_review", "Human review")} vocabulary={vocabulary} />);
-    expect(screen.getAllByText("human_review").length).toBeGreaterThan(0);
+    render(<RecommendationPanel review={review("human_review", "Human review")} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Human review");
     expect(screen.getByText("Human review")).toBeInTheDocument();
     render(<ReasoningTrace trace={review("human_review", "Human review").trace} />);
     expect(screen.getByText("The rules infer the recommendation human_review.")).toBeInTheDocument();
