@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WaziArt — See the Reason. Challenge the Decision.</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#submit-heading">Skip to submission</a>
+  <header class="banner">
+    <p class="mark">WaziArt</p>
+    <h1>See the Reason. Challenge the Decision.</h1>
+    <p class="lede">An explainable assistant for exhibition review. It recommends a next step for a human reviewer. It does not measure artistic worth, and it does not accept or reject a work.</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="samples-heading">
+      <h2 id="samples-heading">Sample submissions</h2>
+      <p>These buttons fill the form. Nothing is reviewed until you submit it.</p>
+      <div class="row">
+        <button type="button" id="sample-gap">Fill: permission not supplied</button>
+        <button type="button" id="sample-ready">Fill: ready for review</button>
+        <button type="button" id="sample-dispute">Fill: disputed permission</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="submit-heading">
+      <h2 id="submit-heading">Submit artwork</h2>
+      <p>Leave a field blank to show how missing information is reasoned about. Evidence is a concept you choose, not a reading of the description.</p>
+      <form id="submit-form">
+        <div class="field">
+          <label for="artwork-id">Identifier <span class="hint">optional, such as paths-to-peace</span></label>
+          <input id="artwork-id" name="artwork_id" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="title">Title</label>
+          <input id="title" name="title" maxlength="200" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" maxlength="2000" rows="4"></textarea>
+          <p class="hint" id="description-hint">Stored as text. WaziArt does not infer evidence from this paragraph.</p>
+        </div>
+        <div class="field">
+          <label for="theme">Exhibition theme</label>
+          <select id="theme" name="theme">
+            <option value="">Not supplied</option>
+            <option value="peace">peace</option>
+            <option value="other">Other token</option>
+          </select>
+        </div>
+        <div class="field" id="theme-other-field" hidden>
+          <label for="theme-other">Other theme token</label>
+          <input id="theme-other" name="theme_other" autocomplete="off">
+        </div>
+        <fieldset>
+          <legend>Permission to exhibit</legend>
+          <div class="choices">
+            <label><input type="radio" name="permission" value="" checked> Not supplied</label>
+            <label><input type="radio" name="permission" value="confirmed"> Confirmed</label>
+            <label><input type="radio" name="permission" value="missing"> Marked missing</label>
+            <label><input type="radio" name="permission" value="disputed"> Disputed</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Evidence concepts</legend>
+          <div id="evidence-rows"></div>
+          <button type="button" id="add-evidence">Add evidence</button>
+        </fieldset>
+        <p id="form-alert" class="alert" role="alert" tabindex="-1" hidden></p>
+        <button type="submit" id="submit-button">Submit for review</button>
+      </form>
+    </section>
+
+    <section aria-labelledby="saved-heading">
+      <h2 id="saved-heading">Stored submissions</h2>
+      <p id="saved-empty">No submissions are stored in this snapshot yet.</p>
+      <ul id="saved-list" class="saved"></ul>
+    </section>
+
+    <section id="results" aria-labelledby="results-heading" hidden>
+      <h2 id="results-heading" tabindex="-1">Review</h2>
+      <p id="status-line" class="status" role="status"></p>
+      <p id="disclaimer"></p>
+      <h3>Why this recommendation</h3>
+      <ol id="trace"></ol>
+      <h3>Current facts</h3>
+      <dl id="facts"></dl>
+      <h3>Reasoning relationships</h3>
+      <p>Each row is an edge inferred by MeTTa. The relationship is written out, not conveyed by color alone.</p>
+      <div class="table-wrap">
+        <table>
+          <caption>Relationships among this artwork, its evidence, the rules, and the recommendation</caption>
+          <thead>
+            <tr><th scope="col">From</th><th scope="col">Relationship</th><th scope="col">To</th><th scope="col">MeTTa</th></tr>
+          </thead>
+          <tbody id="edges"></tbody>
+        </table>
+      </div>
+      <h3 id="change-heading" tabindex="-1">What changed</h3>
+      <div id="changes"></div>
+      <h3>Challenge or correct a fact</h3>
+      <p>A correction keeps the previous fact and adds a new one. A dispute leaves the fact in place and marks it contested. MeTTa then infers the recommendation again.</p>
+      <form id="challenge-form">
+        <div class="field">
+          <label for="challenge-target">Fact</label>
+          <select id="challenge-target" name="target"></select>
+        </div>
+        <fieldset>
+          <legend>Action</legend>
+          <div class="choices">
+            <label><input type="radio" name="action" value="correct" checked> Correct</label>
+            <label><input type="radio" name="action" value="dispute"> Dispute</label>
+          </div>
+        </fieldset>
+        <div class="field" id="new-value-field">
+          <label for="new-value" id="new-value-label">Corrected value</label>
+          <input id="new-value" name="value" autocomplete="off">
+          <select id="new-value-select" hidden></select>
+        </div>
+        <div class="field">
+          <label for="challenge-note">Note <span class="hint">optional</span></label>
+          <textarea id="challenge-note" name="note" rows="3" maxlength="500"></textarea>
+        </div>
+        <p id="challenge-alert" class="alert" role="alert" tabindex="-1" hidden></p>
+        <button type="submit" id="challenge-button">Record challenge and reassess</button>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <p id="footer-status">Loading the MeTTa runtime…</p>
+  </footer>
+  <noscript>WaziArt needs JavaScript only to call the local review service. The reasoning itself runs in MeTTa.</noscript>
+  <script src="/app.js"></script>
+</body>
+</html>

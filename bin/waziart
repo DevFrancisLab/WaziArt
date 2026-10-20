@@ -1,0 +1,10 @@
+#!/bin/sh
+# Start the local WaziArt interface with the project virtualenv when it exists.
+ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+if [ -x "$ROOT/venv/bin/python" ]; then
+  PY="$ROOT/venv/bin/python"
+else
+  PY=python3
+fi
+exec "$PY" -m waziart "$@"
