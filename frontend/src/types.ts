@@ -63,6 +63,17 @@ export interface Review {
   challenges: ChallengeRecord[];
 }
 
+export interface SimpleExplanation {
+  artwork_id: string;
+  recommendation: string;
+  label: string;
+  revision: string;
+  provider: string;
+  model: string;
+  explanation: string;
+  kind: string;
+}
+
 export interface Vocabulary {
   exhibition_theme: string;
   concepts: string[];

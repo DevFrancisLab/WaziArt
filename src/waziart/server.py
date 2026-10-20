@@ -19,6 +19,7 @@ import hyperon
 
 from waziart import __version__
 from waziart.errors import NotFoundError, WaziError
+from waziart.explain import clean_question, explain_review
 from waziart.present import LABELS, present_review
 from waziart.images import CONTENT_TYPES, resolve_image
 from waziart.service import ChallengeInput, EvidenceInput, ReviewService, Submission
@@ -130,6 +131,12 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 self._json(201, present_review(review))
                 return
             prefix = "/api/artworks/"
+            explanation = "/explanation"
+            if path.startswith(prefix) and path.endswith(explanation):
+                artwork_id = path[len(prefix) : -len(explanation)]
+                review = present_review(self.server.service.review(artwork_id))
+                self._json(200, explain_review(review, clean_question(body.get("question"))))
+                return
             suffix = "/challenges"
             if path.startswith(prefix) and path.endswith(suffix):
                 artwork_id = path[len(prefix) : -len(suffix)]
@@ -193,7 +200,9 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self._bytes(200, payload, content_type)
 
     def _error(self, exc: WaziError) -> None:
-        status = 404 if isinstance(exc, NotFoundError) else 400
+        status = getattr(exc, "http_status", None)
+        if status is None:
+            status = 404 if isinstance(exc, NotFoundError) else 400
         self._json(status, {"error": str(exc)})
 
     def _summary(self, item: dict) -> dict:

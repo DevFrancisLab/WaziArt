@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, challengeArtwork, getArtwork, getVocabulary, listArtworks, submitArtwork } from "./api";
+import { ApiError, challengeArtwork, explainArtwork, getArtwork, getVocabulary, listArtworks, submitArtwork } from "./api";
 import { AccessibleStatusMessage } from "./components/AccessibleStatusMessage";
 import { ArtworkFigure } from "./components/ArtworkFigure";
 import { ArtworkSubmissionForm } from "./components/ArtworkSubmissionForm";
 import { RecommendationPanel } from "./components/RecommendationPanel";
 import { ReviewDesk } from "./components/ReviewDesk";
+import type { StoredExplanation } from "./components/SimpleExplanation";
 import { Sidebar } from "./components/Sidebar";
 import type { SectionKey } from "./conversation";
+import { reviewStamp } from "./reviewStamp";
 import type { ArtworkSummary, ChallengeBody, Review, SubmissionBody, Vocabulary } from "./types";
 
 const ARTWORK_PARAM = "artwork";
@@ -48,6 +50,11 @@ export function App() {
   const [attempt, setAttempt] = useState(0);
   const returnFocus = useRef<HTMLElement | null>(null);
   const pendingFocus = useRef<"review" | "revision" | null>(null);
+  const reviewRef = useRef<Review | null>(null);
+  const explainRequest = useRef(0);
+  const [explanation, setExplanation] = useState<StoredExplanation | null>(null);
+  const [explanationError, setExplanationError] = useState("");
+  const [explaining, setExplaining] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,6 +235,38 @@ export function App() {
     }
   }
 
+  reviewRef.current = review;
+
+  async function handleExplain(question: string) {
+    const current = reviewRef.current;
+    if (!current) return;
+    const requestId = explainRequest.current + 1;
+    explainRequest.current = requestId;
+    const stamp = reviewStamp(current);
+    setExplaining(true);
+    setExplanation(null);
+    setExplanationError("");
+    try {
+      const result = await explainArtwork(current.artwork_id, question);
+      const latest = reviewRef.current;
+      if (requestId !== explainRequest.current || !latest || reviewStamp(latest) !== stamp) return;
+      if (result.artwork_id !== latest.artwork_id || result.recommendation !== latest.recommendation) return;
+      setExplanation({
+        stamp,
+        artworkId: result.artwork_id,
+        recommendation: result.recommendation,
+        text: result.explanation,
+        model: result.model,
+      });
+    } catch (error) {
+      if (requestId !== explainRequest.current) return;
+      const message = error instanceof Error ? error.message : "The simple explanation could not be written.";
+      setExplanationError(message);
+    } finally {
+      if (requestId === explainRequest.current) setExplaining(false);
+    }
+  }
+
   const showEmpty = !loading && !loadError && !review && artworks.length === 0;
   const showChooser = !loading && !loadError && !review && artworks.length > 0;
   const title = review?.records.find((record) => record.role === "title")?.value || review?.artwork_id;
@@ -271,7 +310,12 @@ export function App() {
         Skip to review
       </a>
       <main className={showEmpty || showChooser ? "workspace workspace-idle" : "workspace"} id="review">
-        {showEmpty || showChooser ? (
+        {loading ? (
+          <>
+            <p className="mark">WaziArt</p>
+            <AccessibleStatusMessage message={status || "Loading…"} />
+          </>
+        ) : showEmpty || showChooser ? (
           <div className="idle">
             <p className="mark">WaziArt</p>
             <h1>{showEmpty ? "No artwork yet" : "Choose an artwork"}</h1>
@@ -280,7 +324,6 @@ export function App() {
         ) : (
           <>
             <p className="mark">WaziArt</p>
-            {loading ? <AccessibleStatusMessage message={status || "Loading…"} /> : null}
             {loadError ? (
               <p className="live alert" role="alert">
                 {loadError}{" "}
@@ -366,6 +409,12 @@ export function App() {
             sections={sections}
             onSection={(key, open) => setSections((current) => ({ ...current, [key]: open }))}
             onChallenge={handleChallenge}
+            explanation={explanation}
+            explanationError={explanationError}
+            explaining={explaining}
+            onExplain={(question) => {
+              void handleExplain(question);
+            }}
           />
         ) : (
           <p className="hint">Open an artwork to see its review.</p>

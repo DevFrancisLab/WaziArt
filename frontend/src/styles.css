@@ -585,6 +585,21 @@ th, td {
 
 .drawer-close { display: inline-flex; margin-bottom: var(--space-3); }
 
+.simple-explanation { margin-bottom: var(--space-4); }
+
+.explain-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.explain-bar input { flex: 1 1 12rem; min-height: 44px; padding: 0.45rem 0.6rem; }
+
+.rule-notes { margin: 0; padding-left: 1.1rem; }
+
+.rule-notes p { margin: 0.2rem 0; }
+
 .drawer .graph-scroll, .drawer .table-wrap { max-width: 100%; }
 
 .scrim {

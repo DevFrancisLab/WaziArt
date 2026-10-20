@@ -11,3 +11,11 @@ class NotFoundError(WaziError):
 
 class SnapshotError(WaziError):
     """Stored atoms could not be restored safely."""
+
+
+class ProviderError(WaziError):
+    """The optional explanation provider failed. The MeTTa review is unchanged."""
+
+    def __init__(self, message: str, http_status: int = 502):
+        super().__init__(message)
+        self.http_status = http_status

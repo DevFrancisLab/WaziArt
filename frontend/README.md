@@ -72,4 +72,6 @@ The open artwork is stored in the page address as `?artwork=`. Reloading the pag
 
 A new submission includes an artwork image. The file is sent as multipart form data and saved under `data/uploads/` with a generated name. MeTTa stores that name, not the image bytes, and the picture is not treated as evidence. Artworks stored earlier without an image still open. The image URL is `/api/uploads/<name>`, which Vite proxies with the rest of `/api`.
 
-A correction is not saved until you confirm it. Confirm sends the existing challenge request. There is no language-model API.
+A correction is not saved until you confirm it. Confirm sends the existing challenge request.
+
+**See reasoning** opens the MeTTa trace, the rules named in that trace, relationships, facts, and history. **Explain simply** asks the Python API for a short Qwen restatement of that same result. The request is not sent when an artwork opens. If Groq is unconfigured or fails, the MeTTa review stays on screen. The API key is not part of the frontend.

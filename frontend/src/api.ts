@@ -1,4 +1,4 @@
-import type { ArtworkSummary, ChallengeBody, Review, SubmissionBody, Vocabulary } from "./types";
+import type { ArtworkSummary, ChallengeBody, Review, SimpleExplanation, SubmissionBody, Vocabulary } from "./types";
 
 /** Raised when the Python API returns an error body or an unreadable response. */
 export class ApiError extends Error {
@@ -83,6 +83,14 @@ export function submitArtwork(body: SubmissionBody, image: File): Promise<Review
   return request<Review>("/api/artworks", {
     method: "POST",
     body: form,
+  });
+}
+
+export function explainArtwork(artworkId: string, question = ""): Promise<SimpleExplanation> {
+  const trimmed = question.trim();
+  return request<SimpleExplanation>(`/api/artworks/${encodeURIComponent(artworkId)}/explanation`, {
+    method: "POST",
+    body: JSON.stringify(trimmed ? { question: trimmed } : {}),
   });
 }
 

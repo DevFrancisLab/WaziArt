@@ -99,7 +99,7 @@ describe("side drawers", () => {
     await user.click(screen.getByRole("button", { name: "See reasoning" }));
     const reasoning = screen.getByRole("dialog", { name: "See reasoning" });
     expect(within(reasoning).getByText("Permission was not supplied, so it is not treated as confirmed.")).toBeInTheDocument();
-    expect(within(reasoning).getByText("Matched facts")).toBeInTheDocument();
+    expect(within(reasoning).getByText("Facts")).toBeInTheDocument();
     expect(within(reasoning).getByText("Reasoning trace")).toBeInTheDocument();
     expect(within(reasoning).getByRole("heading", { name: "Correct information" })).toBeInTheDocument();
     await user.selectOptions(within(reasoning).getByLabelText("Fact"), "permission|");

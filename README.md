@@ -14,6 +14,15 @@ These are recommendations to a human reviewer. They are not judgements of artist
 
 The description is stored as text. WaziArt does not read it for evidence. Evidence is a concept the artist selects, such as `reconciliation` or `dialogue`.
 
+A simple explanation can optionally restate that MeTTa result in plain language. It uses Qwen through Groq and is not the source of the recommendation. Review, upload, and correction work with no API key and no network call to Groq. Put the key in the ignored `.env` file at the repository root:
+
+```bash
+GROQ_API_KEY=your-key
+GROQ_MODEL=qwen/qwen3.8-27b
+```
+
+`GROQ_MODEL` is optional. The default is `qwen/qwen3.8-27b`. The key stays on the Python process. The browser asks `POST /api/artworks/{id}/explanation` only after **Explain simply**. If Groq is missing or rejects the request, the MeTTa recommendation and its detailed reasoning stay on screen. The model cannot change facts, challenges, or the recommendation.
+
 ## Requirements
 
 - Python 3.9.6 (the version used to verify this project)
@@ -60,6 +69,19 @@ Open `http://127.0.0.1:5173`. Vite proxies `/api` to port 8000.
 
 `./bin/waziart-dev` starts both. Node.js 20 or newer is required. See `frontend/README.md` for the production build. `python -m waziart` does not serve the React build.
 
+The screen starts centered, with no artwork selected. **Upload artwork** opens the submission form over the page. **Submissions** opens the saved works. Choosing one shows its image, when one was stored, and the MeTTa recommendation. **See reasoning** opens the trace, the rules named in that trace, relationships, facts, and history. **Explain simply** is a separate request for a short Qwen restatement. A correction is not saved until you confirm it.
+
+To rehearse without writing to `data/space.metta`, point the API at another snapshot and the dev server at that API:
+
+```bash
+python -m waziart --host 127.0.0.1 --port 8794 --data /tmp/waziart-recording/space.metta
+```
+
+```bash
+cd frontend
+WAZIART_API=http://127.0.0.1:8794 npx vite --port 5176 --strictPort --host 127.0.0.1
+```
+
 Use a keyboard: every control is a button, link, or field, and focus is outlined. The recommendation is named in text. The relationship table is the reasoning graph; color is only an extra cue.
 
 ## Test
@@ -69,7 +91,7 @@ source venv/bin/activate
 python -m unittest discover -s tests -v
 ```
 
-The tests load the `.metta` rules, infer each recommendation, show that missing permission is not confirmed, record a challenge that changes the result, keep superseded facts visible through `(fact-history ...)`, rebuild the graph from inferred edges, restore a snapshot after a new process, and reject snapshot text that would be executable MeTTa.
+The tests load the `.metta` rules, infer each recommendation, show that missing permission is not confirmed, record a challenge that changes the result, keep superseded facts visible through `(fact-history ...)`, rebuild the graph from inferred edges, restore a snapshot after a new process, and reject snapshot text that would be executable MeTTa. Explanation tests mock the Groq response. They do not need an API key.
 
 Frontend tests, from `frontend/` after `npm install`:
 

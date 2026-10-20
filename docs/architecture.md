@@ -21,6 +21,7 @@ src/waziart/symbols.py         Safe atoms and the snapshot whitelist
 src/waziart/runtime.py         Hyperon runner, queries, and snapshot swap
 src/waziart/service.py         Submit, challenge, and re-infer
 src/waziart/present.py         Sentences for atoms MeTTa already returned
+src/waziart/explain.py         Optional Qwen restatement of a finished review
 src/waziart/server.py          Local HTML and JSON interface
 src/waziart/static/            The original accessible page still served by Python
 frontend/                      React, Vite, and TypeScript interface
