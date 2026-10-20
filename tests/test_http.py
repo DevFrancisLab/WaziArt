@@ -67,6 +67,10 @@ class InterfaceTests(unittest.TestCase):
         )
         self.assertEqual(revised["recommendation"], "recommend_for_review")
         self.assertIn("changed from request_information to recommend_for_review", revised["revisions"][-1]["summary"])
+        self.assertEqual(revised["challenges"][-1]["note"], "Letter received.")
+        self.assertIsNone(revised["challenges"][-1]["previous_value"])
+        self.assertEqual(revised["challenges"][-1]["new_value"], "confirmed")
+        self.assertTrue(any(item["role"] == "permission" and item["status"] == "current" for item in revised["history"]))
 
         status, missing = self._open("/api/artworks/does-not-exist")
         self.assertEqual(status, 404)

@@ -1,0 +1,31 @@
+#!/bin/sh
+# Start the Python API on port 8000 and the React dev server.
+# Uses data/space.metta, the default snapshot. It does not touch other snapshot files.
+ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+if [ -x "$ROOT/.tools/node/bin/npm" ]; then
+  PATH="$ROOT/.tools/node/bin:$PATH"
+  export PATH
+fi
+if ! command -v npm >/dev/null 2>&1; then
+  echo "Node.js 20 or newer is required. See frontend/README.md." >&2
+  exit 1
+fi
+if [ -x "$ROOT/venv/bin/python" ]; then
+  PY="$ROOT/venv/bin/python"
+else
+  PY=python3
+fi
+"$PY" -m waziart --host 127.0.0.1 --port 8000 &
+API_PID=$!
+trap 'kill "$API_PID" 2>/dev/null' EXIT INT TERM
+i=0
+while [ "$i" -lt 60 ]; do
+  if curl -sf "http://127.0.0.1:8000/api/health" >/dev/null; then
+    break
+  fi
+  i=$((i + 1))
+  sleep 1
+done
+cd "$ROOT/frontend" || exit 1
+npm run dev

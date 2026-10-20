@@ -33,6 +33,10 @@ The theme symbol `peace` and the six supporting concepts live in `metta/core/sch
 
 There is no SQL database, graph database, LLM client, API key, or WhatsApp integration. The only dependency is `hyperon==0.2.10`. The interface is the Python standard-library HTTP server.
 
+## Fact history is a query, not a second decision
+
+`(fact-history Artwork)` lists stored facts and whether each one is still current. The React page uses it to show a value that a correction replaced. The recommendation function does not call it.
+
 ## Persistence claim
 
 Restart-and-restore is covered by `tests/test_persistence.py`: a new `ReviewService` on the same file sees the challenge, a repeated restore does not duplicate atoms, a malformed file leaves the previous space in place, and a snapshot that contains `!(...)` or `(= ...)` is refused. The running server stores that file at `data/space.metta`, which is gitignored.

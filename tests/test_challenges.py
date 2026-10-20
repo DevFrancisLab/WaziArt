@@ -47,6 +47,8 @@ class ChallengeTests(unittest.TestCase):
         self.assertTrue(any("corrects none" in edge for edge in edges))
         self.assertTrue(any("changes request_information recommend_for_review" in edge for edge in edges))
         self.assertEqual(revised["challenges"][-1]["note"], "The gallery confirmed the right to exhibit this work.")
+        self.assertIsNone(revised["challenges"][-1]["previous_value"])
+        self.assertEqual(revised["challenges"][-1]["new_value"], "confirmed")
         self.assertNotIn("(trace rule-required (missing permission))", exprs(revised))
 
     def test_correcting_an_explicit_fact_preserves_the_old_fact(self):
@@ -71,6 +73,15 @@ class ChallengeTests(unittest.TestCase):
         self.assertEqual(revised["recommendation"], "recommend_for_review")
         current = [record for record in revised["records"] if record["role"] == "permission"]
         self.assertEqual(current, [{"fact_id": current[0]["fact_id"], "role": "permission", "value": "confirmed"}])
+        permission_history = [item for item in revised["history"] if item["role"] == "permission"]
+        self.assertEqual(
+            [(item["status"], item["value"]) for item in permission_history],
+            [("superseded", "missing"), ("current", "confirmed")],
+        )
+        challenge = revised["challenges"][-1]
+        self.assertEqual(challenge["previous_value"], "missing")
+        self.assertEqual(challenge["new_value"], "confirmed")
+        self.assertEqual(challenge["note"], "Letter received.")
 
     def test_disputing_evidence_changes_a_ready_submission(self):
         ready = self.service.submit(

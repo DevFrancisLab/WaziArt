@@ -64,6 +64,45 @@
        ((() $fid)
         ($_ (empty))))))
 
+; Every stored fact, including ones a correction has superseded.
+; `current` and `superseded` describe currency. They do not change
+; (recommendation ...). The interface uses this to show the old value.
+(= (fact-history $id)
+   (match &self (fact $fid $id title $text)
+     (case (is-superseded $fid)
+       ((() (history $fid title current $text))
+        ($_ (history $fid title superseded $text))))))
+
+(= (fact-history $id)
+   (match &self (fact $fid $id description $text)
+     (case (is-superseded $fid)
+       ((() (history $fid description current $text))
+        ($_ (history $fid description superseded $text))))))
+
+(= (fact-history $id)
+   (match &self (fact $fid $id theme $theme)
+     (case (is-superseded $fid)
+       ((() (history $fid theme current $theme))
+        ($_ (history $fid theme superseded $theme))))))
+
+(= (fact-history $id)
+   (match &self (fact $fid $id permission $status)
+     (case (is-superseded $fid)
+       ((() (history $fid permission current $status))
+        ($_ (history $fid permission superseded $status))))))
+
+(= (fact-history $id)
+   (match &self (fact $fid $id evidence $eid $concept)
+     (case (is-superseded $fid)
+       ((() (history $fid evidence current $eid $concept))
+        ($_ (history $fid evidence superseded $eid $concept))))))
+
+(= (fact-history $id)
+   (match &self (fact $fid $id evidence-note $eid $text)
+     (case (is-superseded $fid)
+       ((() (history $fid evidence-note current $eid $text))
+        ($_ (history $fid evidence-note superseded $eid $text))))))
+
 ; Both arguments are recommendation symbols already inferred by MeTTa.
 ; This does not re-decide the submission; it records whether the two
 ; inferred results differ.

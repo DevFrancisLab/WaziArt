@@ -176,6 +176,7 @@ class ReviewService:
             "trace": [self._quoted(atom) for atom in self.knowledge.query(f"(trace-item {artwork_id})")],
             "edges": [self._quoted(atom) for atom in self.knowledge.query(f"(graph-edge {artwork_id})")],
             "records": [self._record(atom) for atom in self.knowledge.query(f"(live-record {artwork_id})")],
+            "history": self._history(artwork_id),
             "revisions": self._revisions(artwork_id, highlight),
             "challenges": self._challenges(artwork_id),
         }
@@ -405,25 +406,28 @@ class ReviewService:
         children = expression_children(atom)
         if not children or atom_symbol(children[0]) != "record":
             raise WaziError(f"MeTTa returned an unexpected current fact: {atom}")
-        fact_id = _child_symbol(children, 1)
-        role = _child_symbol(children, 2)
+        return self._record_body(children, _child_symbol(children, 1), _child_symbol(children, 2), value_index=3)
+
+    @staticmethod
+    def _record_body(children: list[Atom], fact_id: str, role: str, value_index: int) -> dict:
+        """Read a fact body. History atoms insert a currency symbol before the value."""
         if role == "evidence":
             return {
                 "fact_id": fact_id,
                 "role": role,
-                "evidence_id": _child_symbol(children, 3),
-                "value": _child_symbol(children, 4),
+                "evidence_id": _child_symbol(children, value_index),
+                "value": _child_symbol(children, value_index + 1),
             }
         if role == "evidence-note":
             return {
                 "fact_id": fact_id,
                 "role": role,
-                "evidence_id": _child_symbol(children, 3),
-                "value": _child_text(children, 4),
+                "evidence_id": _child_symbol(children, value_index),
+                "value": _child_text(children, value_index + 1),
             }
         if role in {"title", "description"}:
-            return {"fact_id": fact_id, "role": role, "value": _child_text(children, 3)}
-        return {"fact_id": fact_id, "role": role, "value": _child_symbol(children, 3)}
+            return {"fact_id": fact_id, "role": role, "value": _child_text(children, value_index)}
+        return {"fact_id": fact_id, "role": role, "value": _child_symbol(children, value_index)}
 
     def _revisions(self, artwork_id: str, highlight: str | None) -> list[dict]:
         revisions = []
@@ -448,7 +452,27 @@ class ReviewService:
             revisions[-1]["latest"] = True
         return revisions
 
+    def _history(self, artwork_id: str) -> list[dict]:
+        """Return every stored fact, current and superseded, from MeTTa."""
+        items = [self._history_record(atom) for atom in self.knowledge.query(f"(fact-history {artwork_id})")]
+        items.sort(key=lambda item: _numeric_suffix(item["fact_id"]))
+        return items
+
+    def _history_record(self, atom: Atom) -> dict:
+        children = expression_children(atom)
+        if not children or atom_symbol(children[0]) != "history":
+            raise WaziError(f"MeTTa returned an unexpected fact history: {atom}")
+        fact_id = _child_symbol(children, 1)
+        role = _child_symbol(children, 2)
+        status = _child_symbol(children, 3)
+        if status not in {"current", "superseded"}:
+            raise WaziError(f"MeTTa returned an unexpected fact currency: {atom}")
+        record = self._record_body(children, fact_id, role, value_index=4)
+        record["status"] = status
+        return record
+
     def _challenges(self, artwork_id: str) -> list[dict]:
+        history = {item["fact_id"]: item for item in self._history(artwork_id)}
         challenges = []
         for atom in self.knowledge.query(f"(challenge-of {artwork_id})"):
             children = expression_children(atom)
@@ -457,12 +481,16 @@ class ReviewService:
             challenge_id = _child_symbol(children, 1)
             notes = self.knowledge.query(f"(note-of {challenge_id})")
             note = grounded_text(notes[0]) if len(notes) == 1 else ""
+            previous_fact = _child_symbol(children, 3)
+            new_fact = _child_symbol(children, 4)
             challenges.append(
                 {
                     "challenge_id": challenge_id,
                     "action": _child_symbol(children, 2),
-                    "previous_fact": _child_symbol(children, 3),
-                    "new_fact": _child_symbol(children, 4),
+                    "previous_fact": previous_fact,
+                    "new_fact": new_fact,
+                    "previous_value": _stored_value(history, previous_fact),
+                    "new_value": _stored_value(history, new_fact),
                     "note": note or "",
                     "expr": repr(atom),
                 }
@@ -532,3 +560,13 @@ def _child_text(children: list[Atom], index: int) -> str:
 def _numeric_suffix(identifier: str) -> int:
     suffix = identifier.rsplit("-", 1)[-1]
     return int(suffix) if suffix.isdigit() else 0
+
+
+def _stored_value(history: dict, fact_id: str):
+    """Value of a stored fact. `none` means the field was not stored yet."""
+    if fact_id == "none":
+        return None
+    item = history.get(fact_id)
+    if item is None:
+        return None
+    return item["value"]

@@ -21,7 +21,8 @@ src/waziart/runtime.py         Hyperon runner, queries, and snapshot swap
 src/waziart/service.py         Submit, challenge, and re-infer
 src/waziart/present.py         Sentences for atoms MeTTa already returned
 src/waziart/server.py          Local HTML and JSON interface
-src/waziart/static/            The accessible review page
+src/waziart/static/            The original accessible page still served by Python
+frontend/                      React, Vite, and TypeScript interface
 tests/                         Reasoning, challenge, persistence, HTTP, and demo tests
 ```
 
@@ -81,7 +82,11 @@ Rules are loaded again from the project files on every restore, so a snapshot ca
 
 ## Interface
 
-`python -m waziart` serves one HTML page. The page submits JSON, then shows the recommendation, the trace, a relationship table, and a challenge form. Status is written in words. The MeTTa expression is shown next to each sentence.
+`python -m waziart` still serves the original HTML page in `src/waziart/static/`. The React application in `frontend/` is a separate dev server. It calls the same JSON API and does not choose a recommendation. Vite proxies `/api` to port 8000. `npm run build` writes `frontend/dist`. The Python process does not serve that directory; `npm run preview` does, with the same proxy.
+
+`(fact-history Artwork)` returns every stored fact with `current` or `superseded`. The API adds `history` to a review and fills `previous_value` and `new_value` on each challenge from those atoms. Recommendation rules do not read `fact-history`.
+
+The React page draws one node per endpoint of a returned `(edge ...)` and repeats the edges in a table. Edges whose relation is `evaluated-by` are exhibition criteria. The other edges belong to the submission.
 
 ## What the description does not do
 

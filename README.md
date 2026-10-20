@@ -44,9 +44,21 @@ export PYTHONPATH=src
 python -m waziart
 ```
 
-Or `./bin/waziart`. Open `http://127.0.0.1:8000`.
+Or `./bin/waziart`. Open `http://127.0.0.1:8000` for the original static page. Submissions are written to `data/space.metta` and loaded again on the next start.
 
-The page can fill three samples. Submit one, read the recommendation and the MeTTa trace, then challenge a fact. Submissions are written to `data/space.metta` and loaded again on the next start.
+## React interface
+
+The review workflow also runs as a React application in `frontend/`. It talks to the same API. Start the API as above, then in another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. Vite proxies `/api` to port 8000.
+
+`./bin/waziart-dev` starts both. Node.js 20 or newer is required. See `frontend/README.md` for the production build. `python -m waziart` does not serve the React build.
 
 Use a keyboard: every control is a button, link, or field, and focus is outlined. The recommendation is named in text. The relationship table is the reasoning graph; color is only an extra cue.
 
@@ -57,7 +69,13 @@ source venv/bin/activate
 python -m unittest discover -s tests -v
 ```
 
-The tests load the `.metta` rules, infer each recommendation, show that missing permission is not confirmed, record a challenge that changes the result, rebuild the graph from inferred edges, restore a snapshot after a new process, and reject snapshot text that would be executable MeTTa.
+The tests load the `.metta` rules, infer each recommendation, show that missing permission is not confirmed, record a challenge that changes the result, keep superseded facts visible through `(fact-history ...)`, rebuild the graph from inferred edges, restore a snapshot after a new process, and reject snapshot text that would be executable MeTTa.
+
+Frontend tests, from `frontend/` after `npm install`:
+
+```bash
+npm test
+```
 
 ## How a review is inferred
 
