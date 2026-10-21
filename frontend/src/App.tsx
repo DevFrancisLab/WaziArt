@@ -124,7 +124,12 @@ export function App() {
             (node) => !node.closest("[hidden]") && !node.hasAttribute("disabled") && node.tabIndex !== -1,
           )
         : [];
-    const preferred = drawer === "upload" ? document.getElementById("artwork-image") : focusable()[0];
+    const preferred =
+      drawer === "upload"
+        ? document.getElementById("artwork-image")
+        : drawer === "list"
+          ? document.getElementById("submission-filter")
+          : focusable()[0];
     if (pendingFocus.current !== "revision") preferred?.focus();
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -345,7 +350,7 @@ export function App() {
       {drawer ? (
         <button
           type="button"
-          className={drawer === "list" ? "scrim" : "scrim scrim-modal"}
+          className="scrim scrim-modal"
           aria-label="Close panel"
           onClick={closeDrawer}
         />
@@ -368,28 +373,33 @@ export function App() {
           onSubmit={handleSubmit}
         />
       </div>
-      <aside
+      <div
         id="submission-drawer"
-        className="drawer drawer-left"
+        className="modal submission-panel"
         hidden={drawer !== "list"}
         role={drawer === "list" ? "dialog" : undefined}
         aria-modal={drawer === "list" ? true : undefined}
         aria-label="Submissions"
       >
-        <button type="button" className="drawer-close" onClick={closeDrawer}>
-          Close
-        </button>
-        <Sidebar
-          artworks={artworks}
-          selectedId={review?.artwork_id ?? null}
-          busy={pending !== null}
-          query={query}
-          onQuery={setQuery}
-          onOpen={(artworkId) => {
-            void handleOpen(artworkId);
-          }}
-        />
-      </aside>
+        <header className="panel-bar">
+          <p className="panel-title">Submissions</p>
+          <button type="button" className="panel-close" onClick={closeDrawer}>
+            Close
+          </button>
+        </header>
+        <div className="panel-body">
+          <Sidebar
+            artworks={artworks}
+            selectedId={review?.artwork_id ?? null}
+            busy={pending !== null}
+            query={query}
+            onQuery={setQuery}
+            onOpen={(artworkId) => {
+              void handleOpen(artworkId);
+            }}
+          />
+        </div>
+      </div>
       <div
         id="reasoning-drawer"
         className="modal reasoning-panel"
@@ -398,16 +408,16 @@ export function App() {
         aria-modal={drawer === "reasoning" ? true : undefined}
         aria-label="See reasoning"
       >
-        <header className="reasoning-bar">
+        <header className="panel-bar">
           <div>
             <p className="mark">Reasoning</p>
-            <p className="reasoning-title">{title || "Review"}</p>
+            <p className="panel-title">{title || "Review"}</p>
           </div>
-          <button type="button" className="reasoning-close" onClick={closeDrawer}>
+          <button type="button" className="panel-close" onClick={closeDrawer}>
             Close
           </button>
         </header>
-        <div className="reasoning-body">
+        <div className="panel-body">
           {review ? (
             <ReviewDesk
               review={review}

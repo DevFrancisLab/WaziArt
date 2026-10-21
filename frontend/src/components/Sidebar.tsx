@@ -10,7 +10,7 @@ interface SidebarProps {
   onOpen: (artworkId: string) => void;
 }
 
-/** Saved artworks for the submissions drawer. It does not invent entries. */
+/** Saved artworks for the submissions panel. It does not invent entries. */
 export function Sidebar({ artworks, selectedId, busy, query, onQuery, onOpen }: SidebarProps) {
   const needle = query.trim().toLowerCase();
   const visible = needle
@@ -20,8 +20,7 @@ export function Sidebar({ artworks, selectedId, busy, query, onQuery, onOpen }: 
     : artworks;
 
   return (
-    <section aria-labelledby="stored-heading">
-      <h2 id="stored-heading">Submissions</h2>
+    <section>
       <div className="field">
         <label htmlFor="submission-filter">Filter</label>
         <input id="submission-filter" value={query} autoComplete="off" onChange={(event) => onQuery(event.target.value)} />

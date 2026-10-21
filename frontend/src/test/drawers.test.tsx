@@ -49,6 +49,8 @@ describe("side drawers", () => {
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Submissions" }));
     const submissions = await screen.findByRole("dialog", { name: "Submissions" });
+    expect(submissions).toHaveClass("modal", "submission-panel");
+    expect(submissions).not.toHaveClass("drawer");
     expect(within(submissions).getByText("No artwork yet")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Upload artwork" }));
@@ -117,7 +119,7 @@ describe("side drawers", () => {
     expect(screen.getByRole("dialog", { name: "Submissions" })).toBeInTheDocument();
   });
 
-  it("opens a full-height sheet with a close control at a narrow width", async () => {
+  it("opens submissions in a centered panel with a close control at a narrow width", async () => {
     const original = window.matchMedia;
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: String(query).includes("960"),
@@ -131,7 +133,8 @@ describe("side drawers", () => {
       await userEvent.setup().click(await screen.findByRole("button", { name: "Submissions" }));
       const drawer = document.getElementById("submission-drawer") as HTMLElement;
       expect(drawer).not.toHaveAttribute("hidden");
-      expect(drawer).toHaveClass("drawer", "drawer-left");
+      expect(drawer).toHaveClass("modal", "submission-panel");
+      expect(drawer).not.toHaveClass("drawer");
       expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
       expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth);
     } finally {
