@@ -94,6 +94,7 @@ class ExplanationTests(unittest.TestCase):
             captured["url"] = url
             captured["body"] = body
             captured["authorization"] = headers.get("Authorization", "")
+            captured["user_agent"] = headers.get("User-Agent", "")
             captured["timeout"] = timeout
             return 200, _completion(
                 "Permission was not supplied, so the next step is to request information."
@@ -108,6 +109,7 @@ class ExplanationTests(unittest.TestCase):
         self.assertNotIn(SECRET, json.dumps(result))
         self.assertNotIn(SECRET, captured["body"]["messages"][1]["content"])
         self.assertIn(SECRET, captured["authorization"])
+        self.assertEqual(captured["user_agent"], "WaziArt/0.1")
         self.assertNotIn("/api/uploads", json.dumps(captured["body"]))
         packet = json.loads(captured["body"]["messages"][1]["content"])
         self.assertEqual(packet["recommendation"], "request_information")

@@ -345,7 +345,7 @@ export function App() {
       {drawer ? (
         <button
           type="button"
-          className={drawer === "upload" ? "scrim scrim-modal" : "scrim"}
+          className={drawer === "list" ? "scrim" : "scrim scrim-modal"}
           aria-label="Close panel"
           onClick={closeDrawer}
         />
@@ -390,36 +390,44 @@ export function App() {
           }}
         />
       </aside>
-      <aside
+      <div
         id="reasoning-drawer"
-        className="drawer drawer-right"
+        className="modal reasoning-panel"
         hidden={drawer !== "reasoning"}
         role={drawer === "reasoning" ? "dialog" : undefined}
         aria-modal={drawer === "reasoning" ? true : undefined}
         aria-label="See reasoning"
       >
-        <button type="button" className="drawer-close" onClick={closeDrawer}>
-          Close
-        </button>
-        {review ? (
-          <ReviewDesk
-            review={review}
-            vocabulary={vocabulary}
-            busy={pending === "challenge"}
-            sections={sections}
-            onSection={(key, open) => setSections((current) => ({ ...current, [key]: open }))}
-            onChallenge={handleChallenge}
-            explanation={explanation}
-            explanationError={explanationError}
-            explaining={explaining}
-            onExplain={(question) => {
-              void handleExplain(question);
-            }}
-          />
-        ) : (
-          <p className="hint">Open an artwork to see its review.</p>
-        )}
-      </aside>
+        <header className="reasoning-bar">
+          <div>
+            <p className="mark">Reasoning</p>
+            <p className="reasoning-title">{title || "Review"}</p>
+          </div>
+          <button type="button" className="reasoning-close" onClick={closeDrawer}>
+            Close
+          </button>
+        </header>
+        <div className="reasoning-body">
+          {review ? (
+            <ReviewDesk
+              review={review}
+              vocabulary={vocabulary}
+              busy={pending === "challenge"}
+              sections={sections}
+              onSection={(key, open) => setSections((current) => ({ ...current, [key]: open }))}
+              onChallenge={handleChallenge}
+              explanation={explanation}
+              explanationError={explanationError}
+              explaining={explaining}
+              onExplain={(question) => {
+                void handleExplain(question);
+              }}
+            />
+          ) : (
+            <p className="hint">Open an artwork to see its review.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

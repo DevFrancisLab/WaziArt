@@ -581,9 +581,40 @@ th, td {
 
 .drawer-left { left: 0; border-right: 1px solid var(--line); }
 
-.drawer-right { right: 0; border-left: 1px solid var(--line); }
-
 .drawer-close { display: inline-flex; margin-bottom: var(--space-3); }
+
+.reasoning-panel {
+  width: min(56rem, calc(100% - 2.5rem));
+  max-height: min(90vh, 56rem);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.reasoning-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.reasoning-title {
+  margin: 0.15rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.reasoning-close { flex: 0 0 auto; margin: 0; }
+
+.reasoning-body {
+  overflow: auto;
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
 
 .simple-explanation { margin-bottom: var(--space-4); }
 
@@ -600,7 +631,8 @@ th, td {
 
 .rule-notes p { margin: 0.2rem 0; }
 
-.drawer .graph-scroll, .drawer .table-wrap { max-width: 100%; }
+.drawer .graph-scroll, .drawer .table-wrap,
+.reasoning-panel .graph-scroll, .reasoning-panel .table-wrap { max-width: 100%; }
 
 .scrim {
   position: fixed;

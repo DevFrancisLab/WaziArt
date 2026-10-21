@@ -237,7 +237,12 @@ def _request(body: dict, api_key: str) -> tuple[int, bytes]:
         return post_json(
             GROQ_URL,
             body,
-            {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                # Cloudflare in front of Groq rejects Python's default client signature.
+                "User-Agent": "WaziArt/0.1",
+            },
             TIMEOUT_SECONDS,
         )
     except ProviderError:
